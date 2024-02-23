@@ -1,0 +1,86 @@
+# This code computes the total landing distance required
+
+import math as m
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+#custom function to get P, T, rho given h in Earth standard dry air atmosphere model
+
+g0 = 32.174         # feet per square seconds, std grav acceleration
+R = 1716.5          # feet square per second square per deg Rankine, specific gas constant of air
+F_to_R = 459.67     # to convert deg Fahrenheit to deg Rankine, R = F + 459.67
+a = -0.00357        # deg Rankine per feet, environmental lapse rate
+P_sl = 2116.22      # pounds per square feet, pressure at sea level
+rho_sl = 2.3769e-3  # slugs per cubic feet, density at sea level
+T_sl = 59           # deg Fahrenheit, Temperature at sea level
+T_trop = -69.7      # deg Fahrenheit, Temperature at 36000 feet
+P_trop = 474.59       # pounds per square feet, pressure at 36000 feet
+rho_trop = 7.0864e-4  # slugs per cubic feet, density at 36000 feet
+
+def get_PTrho_given_altitude(h,g0,R,P_sl,rho_sl,F_to_R,a,T_sl,T_trop,P_trop,rho_trop):
+    if h < 36000 :
+        T1 = T_sl + F_to_R                     # deg Rankine, Temperature at sea level
+        T = T1 + a*h                         # deg Rankine, Temperature at h
+        P = P_sl * ( T / T1 )**(-1*g0/(R*a))              # pounds per square feet, Pressure at h
+        rho = rho_sl * ( T / T1 )**(-1*(g0/(R*a) + 1))    # slug per cubic fe   et, Density at h
+    
+    elif h >= 36000 and h < 82000 :          # isotherml region of stratosphere
+        h0 = 36000                           # feet, altitude at tropopause
+        T = T_trop + F_to_R                   # deg Rankine, Temperature at 36000 feet
+        P = P_trop * m.e**(-1*g0*(h - h0)/(R*T))        # pounds per square feet, Pressure at h
+        rho = rho_trop * m.e**(-1*g0*(h - h0)/(R*T))    # slug per feet cube, Density at h
+    
+    return [P, T - F_to_R, rho]     #return Pressure in lb/ft2, Temperature in degF and Density in slugs/ft3
+
+# compute total landing distance for B767-200
+
+W = 300000      # lbf, Weight of aircraft
+S = 3084        # ft^2, planform area
+CD_g = 0.0642     # Drag Coefficient
+V_app = 260      # ft/s, approach speed
+mu_brake = 0.4  # braking friction coefficient
+gamma_app = 0.1047   # radians, angle of approach
+g0 = 32.17       # ft/s^2, gravitational acceleration at sea level
+h_obs = 50      # ft, assumed clearance height of 50 feet
+
+CL_flare_CL_app = 1.2   #ratio of lift coefficient at flare over approach
+CL_g = 0.9      # lift coefficient at ground roll
+
+#radius of flare
+R_flare = V_app**2 / (g0*(CL_flare_CL_app  -1))
+print("Radius of Landing Flare / ft :", R_flare)
+
+#flare distance
+S_flare = R_flare * m.sin(gamma_app/2)
+print("Distance of Landing Flare / ft :", S_flare)
+
+#approach distance
+S_app = h_obs/m.tan(gamma_app)
+print("Distance of Landing Approach / ft :", S_app)
+
+#ground roll distance
+# ground roll acceleration evaluated at V_approach/sqrt(2)
+V_eval = V_app/2**0.5
+print("Speed at which ground roll is evaluated / ft.s-1 :", V_eval)
+#dynamic pressure q_bar
+q_bar = 0.5 * rho_sl * V_eval**2
+print("Dynamic pressure during ground roll / lbf.ft-2 :", q_bar)
+#aero drag
+D_g = CD_g * q_bar * S
+print("Aerodynamic drag during ground roll / lbf :", D_g)
+#aero lift
+L_g = CL_g * q_bar * S
+print("Aerodynamic lift during ground roll / lbf :", L_g)
+#ground roll acceleration
+a_bar = (g0/W)*( -D_g - mu_brake * (W - L_g))
+print("Evaluated acceleration during ground roll / ft.s-2 :", a_bar)
+S_ground = V_app**2 / (-2 * a_bar)
+print("Ground roll distance / ft :", S_ground)
+
+print("Total Landing Distance (Approach + Flare + Ground Roll) / ft :", S_app + S_flare + S_ground)
+print("\n")
+
+# S_ground increase due to tail wind
+new_S_ground = 1.2 * S_ground
+print("New Landing Distance (Approach + Flare + New Ground Roll) / ft :", S_app + S_flare + new_S_ground)
